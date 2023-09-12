@@ -1,90 +1,93 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import "./base-contract.sol";
 
-contract Traceability {
+contract Traceability is BaseContract {
 
-    // siembra
-    struct Sown {
-        uint date;
-        uint8 typeSeed;
-        string rotation;
-        uint32 lotNumber;
+    event NewLotProccess(uint indexed lotId, string indexed processId, address sender, string indexed companyId);
+
+    constructor() {
+        owner = payable(msg.sender);
+        count = 1;
     }
 
-     // cosecha
-    struct Harvest {
-        uint date;
-        uint8 abono;
-        string dotacion;
-        string madurez;
-        uint8 size;
+    uint count;
+
+    struct LotProccess {
+        uint8 processId;
+        string companyId;
+        uint operationStartDate;
+        uint operationEndDate;
+        string location;
+        string additionalInformation;
+        address addedBy;
+        uint lotId;
+        bool isValid;
+        // url image (ToDo)
     }
 
-    // almacenado
-    struct Stored {
-        uint32 packageNumber;
-        uint incomeDate;
-        uint exitDate;
-        uint8 temperature;
+    struct Lot {
+        uint id;
+        uint8 currentProcess;
+        address createdBy;
+        bool isValid;
     }
 
-    // logistica
-    struct Logistic {
-        uint packageId;
-        uint incomeDate;
-        string incomePlace;
-        uint exitDate;
-        string exitPlace;
+    struct Company {
+        string id;
+        string name;
     }
 
-    Sown[] public sownArr;
-    Stored[] public storedArr;
-    Logistic[] public logisticArr;
-    Harvest[] public harvestArr;
+    mapping(uint => Lot) public lotMap;
+    mapping(string => LotProccess) public lotProcessMap;
+    Company[] public companies;
 
-    /* =====================
-        Inserts
-    ======================*/
-
-    function insertSown(uint _date, uint8 _typeSeed, string memory _rotation, uint32 _lotNumber) public {
-        Sown memory sown = Sown(_date, _typeSeed, _rotation, _lotNumber);
-        sownArr.push(sown);
+    function getLotById(uint _id) public view returns(Lot memory) {
+        return lotMap[_id];
     }
 
-    function insertStored(uint32 _packageNumber, uint _incomeDate, uint _exitDate, uint8 _temperature) public {
-        require (_incomeDate >= _exitDate, "exitDate can't less than incomeDate");
-        Stored memory stored = Stored(_packageNumber, _incomeDate, _exitDate, _temperature);
-        storedArr.push(stored);
+    function getLotProccessById(string memory _id) public view returns(LotProccess memory) {
+        return lotProcessMap[_id];
     }
 
-    function insertLogistic(uint _packageId, uint _incomeDate, string memory incomePlace, uint _exitDate, string memory _exitPlace) public {
-        require (_incomeDate >= _exitDate, "exitDate can't less than incomeDate");
-        Logistic memory logistic = Logistic(_packageId, _incomeDate, incomePlace, _exitDate, _exitPlace);
-        logisticArr.push(logistic);
+    function getCompanies() public view returns(Company[] memory) {
+        return companies;
     }
 
-    function insertHarvest(uint _date, uint8 _abono, string memory _dotacion, string memory _madurez, uint8 _size) public {
-        Harvest memory harvest = Harvest(_date, _abono, _dotacion, _madurez, _size);
-        harvestArr.push(harvest);
+    function insertCompany(string memory _id, string memory _name) public onlyOwner {
+        Company memory newCompany = Company(_id, _name);
+        companies.push(newCompany);
     }
 
-     /* =====================
-        Gets
-    ======================*/
-
-    function getSown() public view returns(Sown[] memory) {
-        return sownArr;
-    }
-
-    function getStored() public view returns(Stored[] memory) {
-        return storedArr;
-    }
-
-    function getLogistic() public view returns(Logistic[] memory) {
-        return logisticArr;
-    }
-
-    function getHarvest() public view returns(Harvest[] memory) {
-        return harvestArr;
+    function insertLotProcess(
+        uint8 _currentProcess,
+        string memory _companyId,
+        uint _operationStartDate,
+        uint _operationEndDate,
+        string memory _location,
+        string memory _additionalInformation,
+        uint _lotId
+    ) public {
+        require (_lotId > 0, "Process is not valid");
+        if (lotMap[_lotId].isValid == true) {
+            string memory keyLotProcess = string.concat(Strings.toString(_lotId), "-", Strings.toString(_currentProcess));
+            require (lotProcessMap[keyLotProcess].isValid == true, "Process is not valid");
+            uint8 newProcessId = _currentProcess + 1;
+            keyLotProcess = string.concat(Strings.toString(count), "-", Strings.toString(newProcessId));
+            LotProccess memory newLotProcess = LotProccess(newProcessId, _companyId, _operationStartDate, _operationEndDate, _location, _additionalInformation, msg.sender, _lotId, true);
+            lotProcessMap[keyLotProcess] = newLotProcess;
+            lotMap[_lotId].currentProcess = newProcessId;
+            emit NewLotProccess(_lotId, keyLotProcess, msg.sender, _companyId);
+        } else {
+            uint8 newProcessId = 1;
+            string memory keyLotProcess = string.concat(Strings.toString(count), "-", Strings.toString(newProcessId));
+            Lot memory newLot = Lot(count, newProcessId, msg.sender, true);
+            LotProccess memory newLotProcess = LotProccess(newProcessId, _companyId, _operationStartDate, _operationEndDate, _location, _additionalInformation, msg.sender, count, true);
+            lotMap[count] = newLot;
+            lotProcessMap[keyLotProcess] = newLotProcess;
+            emit NewLotProccess(count, keyLotProcess, msg.sender, _companyId);
+            count += 1;
+        }
     }
 }
