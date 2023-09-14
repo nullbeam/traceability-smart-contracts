@@ -5,7 +5,7 @@ import "./base-contract.sol";
 
 contract Traceability is BaseContract {
 
-    event NewLotProccess(uint indexed lotId, string indexed processId, address sender, string indexed companyId);
+    event NewLotProccess(uint indexed lotId, uint8 indexed processId, address sender);
 
     constructor() {
         owner = payable(msg.sender);
@@ -14,7 +14,7 @@ contract Traceability is BaseContract {
 
     uint count;
 
-    struct LotProccess {
+    struct LotProcess {
         uint8 processId;
         string companyId;
         uint operationStartDate;
@@ -40,15 +40,30 @@ contract Traceability is BaseContract {
     }
 
     mapping(uint => Lot) public lotMap;
-    mapping(string => LotProccess) public lotProcessMap;
+    mapping(string => LotProcess) public lotProcessMap;
+    mapping(string => uint) public lotProcessByCompanyMap;
     Company[] public companies;
 
     function getLotById(uint _id) public view returns(Lot memory) {
         return lotMap[_id];
     }
 
-    function getLotProccessById(string memory _id) public view returns(LotProccess memory) {
+    function getLotProccessById(string memory _id) public view returns(LotProcess memory) {
         return lotProcessMap[_id];
+    }
+
+    function getLotProccessByCompany(string memory _id) public view returns(LotProcess[] memory) {
+        uint indexLot = lotProcessByCompanyMap[_id];
+        require (indexLot != 0, "Process not found");
+        Lot memory lot = lotMap[indexLot];
+        uint8 currentProcess = lot.currentProcess;
+        LotProcess[] memory lotProcesses = new LotProcess[](currentProcess);
+        for(uint8 i = 1; i <= currentProcess; i++) {
+            string memory keyLotProcess = string.concat(Strings.toString(indexLot), "-", Strings.toString(i));
+            lotProcesses[i] = lotProcessMap[keyLotProcess];
+        }
+
+        return lotProcesses;
     }
 
     function getCompanies() public view returns(Company[] memory) {
@@ -69,24 +84,25 @@ contract Traceability is BaseContract {
         string memory _additionalInformation,
         uint _lotId
     ) public {
-        require (_lotId > 0, "Process is not valid");
         if (lotMap[_lotId].isValid == true) {
             string memory keyLotProcess = string.concat(Strings.toString(_lotId), "-", Strings.toString(_currentProcess));
             require (lotProcessMap[keyLotProcess].isValid == true, "Process is not valid");
             uint8 newProcessId = _currentProcess + 1;
-            keyLotProcess = string.concat(Strings.toString(count), "-", Strings.toString(newProcessId));
-            LotProccess memory newLotProcess = LotProccess(newProcessId, _companyId, _operationStartDate, _operationEndDate, _location, _additionalInformation, msg.sender, _lotId, true);
+            keyLotProcess = string.concat(Strings.toString(_lotId), "-", Strings.toString(newProcessId));
+            LotProcess memory newLotProcess = LotProcess(newProcessId, _companyId, _operationStartDate, _operationEndDate, _location, _additionalInformation, msg.sender, _lotId, true);
             lotProcessMap[keyLotProcess] = newLotProcess;
             lotMap[_lotId].currentProcess = newProcessId;
-            emit NewLotProccess(_lotId, keyLotProcess, msg.sender, _companyId);
+            lotProcessByCompanyMap[_companyId] = _lotId;
+            emit NewLotProccess(_lotId, newProcessId, msg.sender);
         } else {
             uint8 newProcessId = 1;
             string memory keyLotProcess = string.concat(Strings.toString(count), "-", Strings.toString(newProcessId));
             Lot memory newLot = Lot(count, newProcessId, msg.sender, true);
-            LotProccess memory newLotProcess = LotProccess(newProcessId, _companyId, _operationStartDate, _operationEndDate, _location, _additionalInformation, msg.sender, count, true);
+            LotProcess memory newLotProcess = LotProcess(newProcessId, _companyId, _operationStartDate, _operationEndDate, _location, _additionalInformation, msg.sender, count, true);
             lotMap[count] = newLot;
             lotProcessMap[keyLotProcess] = newLotProcess;
-            emit NewLotProccess(count, keyLotProcess, msg.sender, _companyId);
+            lotProcessByCompanyMap[_companyId] = count;
+            emit NewLotProccess(count, newProcessId, msg.sender);
             count += 1;
         }
     }
