@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
-import "./base-contract.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract Traceability is BaseContract {
+contract Traceability is Ownable, AccessControl {
+    bytes32 public constant MANAGEMENT_ROLE = keccak256("MANAGEMENT_ROLE");
+    // bytes32 public constant MANAGEMENT_ROLE = keccak256("USER_ROLE");
 
     event NewLotProccess(uint indexed lotId, uint8 indexed processId, address sender);
 
     constructor() {
-        owner = payable(msg.sender);
         count = 1;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     uint count;
@@ -35,8 +38,10 @@ contract Traceability is BaseContract {
     }
 
     struct Company {
-        string id;
+        string documentId;
         string name;
+        string location;
+        uint8[] processes;
     }
 
     mapping(uint => Lot) public lotMap;
@@ -70,9 +75,19 @@ contract Traceability is BaseContract {
         return companies;
     }
 
-    function insertCompany(string memory _id, string memory _name) public onlyOwner {
-        Company memory newCompany = Company(_id, _name);
+    function insertCompany(string memory _documentId, string memory _name, string memory _location, uint8[] memory _processes) public onlyRole(MANAGEMENT_ROLE) {
+        Company memory newCompany = Company(_documentId, _name, _location, _processes);
         companies.push(newCompany);
+    }
+
+    function deleteCompany(uint8 _index, string memory _documentId) public onlyRole(MANAGEMENT_ROLE) {
+        require(_index < companies.length, "index out of bound");
+        Company memory company = companies[_index];
+        require(keccak256(abi.encodePacked(company.documentId)) == keccak256(abi.encodePacked(_documentId)), string.concat("Invalid document id for ", _documentId));
+        for (uint i = _index; i < companies.length - 1; i++) {
+            companies[i] = companies[i + 1];
+        }
+        companies.pop();
     }
 
     function insertLotProcess(
