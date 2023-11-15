@@ -4,6 +4,7 @@ import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
+
 contract Traceability is Ownable, AccessControl {
     bytes32 public constant MANAGEMENT_ROLE = keccak256("MANAGEMENT_ROLE");
     // bytes32 public constant MANAGEMENT_ROLE = keccak256("USER_ROLE");
